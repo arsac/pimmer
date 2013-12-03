@@ -6,8 +6,9 @@ from time import strftime as date
 sys.path.append( './lib/' )
 
 # Here we import the two types of drivers. The event driven driver, and the ticking driver.
-import event_driver as pB_eDriver # For responding to signals
-import tick_driver as pB_tDriver # For constantly sending a type of signal at a certain interval
+import event_driver as eventDriver # For responding to signals
+import tick_driver as tickDriver # For constantly sending a type of signal at a certain interval
+
 
 from interface import *
 #####################################
@@ -33,18 +34,21 @@ def initialize():
     else:
       logging.warning("USB interface not found at (%s). Waiting 1 seconds.", DEVPATH)
       time.sleep(2)
+  
   IBUS.waitClearBus() # Wait for the iBus to clear, then send some initialization signals
   
-  pB_eDriver.init(IBUS)
-  pB_tDriver.init(IBUS)
+  eventDriver.init(IBUS)
+  tickDriver.init(IBUS)
   
 # close the USB device and whatever else is required
 def shutdown():
   global IBUS
+  
   logging.info("Shutting down event driver")
-  pB_eDriver.shutDown()
+  eventDriver.shutDown()
+  
   logging.info("Shutting down tick driver")
-  pB_tDriver.shutDown()
+  tickDriver.shutDown()
   
   if IBUS:
     logging.info("Killing iBUS instance")
@@ -52,4 +56,4 @@ def shutdown():
     IBUS = None
 
 def run():
-  pB_eDriver.listen()
+  eventDriver.listen()

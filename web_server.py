@@ -8,6 +8,7 @@ import module_web as server
 import core as core
 
 import threading
+import socket
 # 
 # #####################################
 # # FUNCTIONS
@@ -29,7 +30,7 @@ import threading
 # pB_web.init()
 # 
 # sys.exit(0)
-
+print "test"
 
 class WebServer(threading.Thread):
 
@@ -44,10 +45,11 @@ class WebServer(threading.Thread):
     def run(self):
 	    
 	    while True and not self.abort:
-	       #try:
-	       self.app.start()
-	       #except:
-	       
+	       try:
+	         self.app.start()
+	       except socket.error, e:
+	         print e
+	         pass
 	       #self.app.start()
 	       #try:
 	         #self.app.start()
@@ -55,7 +57,7 @@ class WebServer(threading.Thread):
 	         #self.app.stop()
 	       #self.app = server.init()
 	       #except Exception e 
-	       #time.sleep(10)
+	       time.sleep(1)
 	    
     
     def isRunning(self):

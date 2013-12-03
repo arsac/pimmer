@@ -9,7 +9,7 @@ import core
 #####################################
 # GLOBALS
 #####################################
-HOST     = 'localhost'
+HOST     = '/var/run/mpd/socket'
 PORT     = '6600'
 PASSWORD = False
 CON_ID   = {'host':HOST, 'port':PORT}
@@ -46,6 +46,11 @@ def init():
     logging.critical("Sleeping 1 second and retrying")
     time.sleep(1)
     init()
+
+def config():
+  if CLIENT:
+     return CLIENT.config()
+
 
 def client():
   return CLIENT

@@ -32,7 +32,7 @@ PYBUS_SOCKET_FILE = "/tmp/ibus_custom.log"
 
 #GLOBALS
 
-HTTP_PORT = 3333
+HTTP_PORT = 8080
 
 
 #########################

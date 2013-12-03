@@ -3,8 +3,9 @@
 import os, sys, time, signal, json, logging, traceback
 import threading
 
-import module_display as pB_display # Only events can manipulate the display stack
-import module_audio as pB_audio # Add the audio module as it will only be manipulated from here in pyBus
+import module_display as Display # Only events can manipulate the display stack
+import module_audio as Audio # Add the audio module as it will only be manipulated from here in pyBus
+import module_web as Web
 
 # This module will read a packet, match it against the json object 'DIRECTIVES' below. 
 # The packet is checked by matching the source value in packet (i.e. where the packet came from) to a key in the object if possible
@@ -72,14 +73,14 @@ TICK = 0.1 # sleep interval in seconds used between iBUS reads
 def init(writer):
   global WRITER, SESSION_DATA
   WRITER = writer
-  pB_display.init(WRITER)
-  pB_audio.init()
+  Display.init(WRITER)
+  Audio.init()
   WRITER.writeBusPacket('18', 'FF', ['02', '01'])
 
   SESSION_DATA["DOOR_LOCKED"] = False
   SESSION_DATA["SPEED_SWITCH"] = False
 
-  pB_display.immediateText('Hi Mailo')
+  Display.immediateText('Hi Mailo')
   WRITER.writeBusPacket('3F', '00', ['0C', '4E', '01']) # Turn on the 'clown nose' for 3 seconds
   
 
@@ -119,9 +120,9 @@ def listen():
 
 def shutDown():
   logging.debug("Quitting Audio Client")
-  #pB_audio.quit()
+  #Audio.quit()
   logging.debug("Stopping Display Driver")
-  pB_display.end()
+  Display.end()
 
 class TriggerRestart(Exception):
   pass
@@ -157,19 +158,19 @@ def d_toggleSS(packet):
   logging.info("Running Custom 1")
   SESSION_DATA['SPEED_SWITCH'] = not SESSION_DATA['SPEED_SWITCH']
   if SESSION_DATA['SPEED_SWITCH']:
-    pB_display.immediateText('SpeedSw: On')
+    Display.immediateText('SpeedSw: On')
   else: 
-    pB_display.immediateText('SpeedSw: Off')
+    Display.immediateText('SpeedSw: Off')
 
 def d_togglePause(packet):
   logging.info("Play/Pause")
-  #status = pB_audio.getInfo()
+  #status = Audio.getInfo()
   if (status['status']['state'] != "play"):
-    pB_display.immediateText('Play')
-    #pB_audio.play()
+    Display.immediateText('Play')
+    #Audio.play()
   else:
-    pB_display.immediateText('Pause')
-    #pB_audio.pause()
+    Display.immediateText('Pause')
+    #Audio.pause()
 
 def d_cdChange3(packet):
   logging.info("Running Custom 3")
@@ -179,13 +180,13 @@ def d_cdChange4(packet):
   
 def d_update(packet):
   logging.info("UPDATE")
-  pB_display.immediateText('UPDATE')
-  #pB_audio.update()
-  #pB_audio.addAll()
+  Display.immediateText('UPDATE')
+  #Audio.update()
+  #Audio.addAll()
   
 def d_RESET(packet):
   logging.info("RESET")
-  pB_display.immediateText('RESET')
+  Display.immediateText('RESET')
   raise TriggerRestart("Restart Triggered")
 
 # This packet is used to parse all messages from the IKE (instrument control electronics), as it contains speed/RPM info. But the data for speed/rpm will vary, so it must be parsed via a method linked to 'ALL' data in the JSON DIRECTIVES
@@ -199,37 +200,37 @@ def d_custom_IKE(packet):
 
 # NEXT command is invoked from the Radio. 
 def d_cdNext(packet):
-  #pB_audio.next()
+  #Audio.next()
   writeCurrentTrack()
   _displayTrackInfo()
 
 def d_cdPrev(packet):
-  #pB_audio.previous()
+  #Audio.previous()
   writeCurrentTrack()
   _displayTrackInfo()
 
 def d_cdScanForward(packet):
   cdSongHundreds, cdSong = _getTrackNumber()
   WRITER.writeBusPacket('18', '68', ['39', '03', '09', '00', '3F', '00', cdSongHundreds, cdSong])
-  #pB_audio.seek(2)
+  #Audio.seek(2)
 
 def d_cdScanBackard(packet):
   cdSongHundreds, cdSong = _getTrackNumber()
   WRITER.writeBusPacket('18', '68', ['39', '04', '09', '00', '3F', '00', cdSongHundreds, cdSong])
-  #pB_audio.seek(-2)
+  #Audio.seek(-2)
 
 # Stop playing, turn off display writing
 def d_cdStopPlaying(packet):
-  #pB_audio.pause()
-  pB_display.setDisplay(False)
+  #Audio.pause()
+  Display.setDisplay(False)
   cdSongHundreds, cdSong = _getTrackNumber()
   WRITER.writeBusPacket('18', '68', ['39', '00', '02', '00', '3F', '00', cdSongHundreds, cdSong])
   
 # Start playing, turn on display writing
 def d_cdStartPlaying(packet):
-  #pB_audio.play()
+  #Audio.play()
   print "start"
-  pB_display.setDisplay(True)
+  Display.setDisplay(True)
   writeCurrentTrack()
   _displayTrackInfo()
 
@@ -246,11 +247,11 @@ def d_cdPollResponse(packet):
 # Enable/Disable Random
 def d_cdRandom(packet):
   packet_data = packet['dat']
-  random = pB_audio.random(0, True)
+  random = Audio.random(0, True)
   if random:
-    pB_display.immediateText('Random: ON')
+    Display.immediateText('Random: ON')
   else:
-    pB_display.immediateText('Random: OFF')
+    Display.immediateText('Random: OFF')
   _displayTrackInfo(False)
    
 # Do whatever you like here regarding the speed!
@@ -258,7 +259,7 @@ def speedTrigger(speed):
   global SESSION_DATA
   if (speed > 100) and SESSION_DATA['SPEED_SWITCH']:
     try:
-        pB_display.immediateText('WINDOWS!')
+        Display.immediateText('WINDOWS!')
         WRITER.writeBusPacket('3F','00', ['0C', '52', '01'])
         WRITER.writeBusPacket('3F','00', ['0C', '41', '01'])
         WRITER.writeBusPacket('3F','00', ['0C', '54', '01'])
@@ -284,12 +285,12 @@ def _displayTrackInfo(text=True):
   if text:
     textQue = _getTrackTextQue()
   infoQue = _getTrackInfoQue()
-  pB_display.setQue(textQue + infoQue)
+  Display.setQue(textQue + infoQue)
 
 # Get some info text to display
 def _getTrackInfoQue():
   displayQue = []
-  status = pB_audio.getInfo()
+  status = Audio.getInfo()
   if ('status' in status):
     mpdStatus = status['status']
     if ('song' in mpdStatus and 'playlistlength' in mpdStatus):
@@ -298,7 +299,7 @@ def _getTrackInfoQue():
 
 # Get the current track number and hundreds.. oh god I should have documented this sooner
 def _getTrackNumber():
-  status = pB_audio.getInfo()
+  status = Audio.getInfo()
   cdSongHundreds = 0
   cdSong = 0
   if ('status' in status):
@@ -311,7 +312,7 @@ def _getTrackNumber():
 # Get the track text to put in display stack
 def _getTrackTextQue():
   displayQue = []
-  status = pB_audio.getInfo()
+  status = Audio.getInfo()
   if ('track' in status):
     trackStatus = status['track']
     if trackStatus:
