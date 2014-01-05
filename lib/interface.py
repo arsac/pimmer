@@ -32,10 +32,10 @@ class ibusFace ( ):
   def __init__(self, devPath,):
     self.SDEV = serial.Serial(
       devPath,
-      baudrate=9600,
-      bytesize=serial.EIGHTBITS,
-      parity=serial.PARITY_EVEN,
-      stopbits=serial.STOPBITS_ONE
+      baudrate = 9600,
+      bytesize = serial.EIGHTBITS,
+      parity = serial.PARITY_EVEN,
+      stopbits = serial.STOPBITS_ONE
     )
     self.SDEV.setDTR(True)
     self.SDEV.flushInput()

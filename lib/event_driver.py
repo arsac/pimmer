@@ -4,7 +4,7 @@ import os, sys, time, signal, json, logging, traceback
 import threading
 
 import module_display as Display # Only events can manipulate the display stack
-import module_audio as Audio # Add the audio module as it will only be manipulated from here in pyBus
+from module_audio import mpdClient as Audio # Add the audio module as it will only be manipulated from here in pyBus
 import module_web as Web
 
 # This module will read a packet, match it against the json object 'DIRECTIVES' below. 
@@ -74,7 +74,7 @@ def init(writer):
   global WRITER, SESSION_DATA
   WRITER = writer
   Display.init(WRITER)
-  Audio.init()
+  
   WRITER.writeBusPacket('18', 'FF', ['02', '01'])
 
   SESSION_DATA["DOOR_LOCKED"] = False

@@ -30,7 +30,7 @@ import socket
 # pB_web.init()
 # 
 # sys.exit(0)
-print "test"
+
 
 class WebServer(threading.Thread):
 
@@ -41,12 +41,17 @@ class WebServer(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.app = server.init()
-        
+    
+    
+    def shutDown(self):
+      self.quit()
+      self.join()
+    
     def run(self):
 	    
 	    while True and not self.abort:
 	       try:
-	         self.app.start()
+	         self.app.run()
 	       except socket.error, e:
 	         print e
 	         pass
@@ -69,3 +74,5 @@ class WebServer(threading.Thread):
 
     def canShutdown(self):
         return (self.abort and not self.running)
+        
+webServer = WebServer()

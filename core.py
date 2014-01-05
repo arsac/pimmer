@@ -1,21 +1,31 @@
 #!/usr/bin/python
 
-import os, sys, time, signal, binascii, termcolor, json, logging, subprocess
+import os, sys, time, signal, binascii, termcolor, json, subprocess
 from time import strftime as date
 
-sys.path.append( './lib/' )
+#sys.path.append( './lib/' )
+
+from config import config
 
 # Here we import the two types of drivers. The event driven driver, and the ticking driver.
 import event_driver as eventDriver # For responding to signals
 import tick_driver as tickDriver # For constantly sending a type of signal at a certain interval
 
+from itunes_sync import itunesSync 
+from module_audio import mpdClient
+from web_server import webServer
 
 from interface import *
+from logger import PLog
+
+
+log = PLog(__name__)
+
 #####################################
 # GLOBALS
 #####################################
-DEVPATH           = "/dev/ttyUSB0" # This is a default, but its always overridden. So not really a default.
-LOGFILE           = "/home/pi/pybus.log" # The logfile. Other logs are compressed and archived. Use zcat to get their content.
+DEVPATH           = config.get("ibus","interface_path")
+LOGFILE           = config.get("general","log_file")
 IBUS              = None
 REGISTERED        = False # This is a temporary measure until state driven behaviour is implemented
 
@@ -27,12 +37,33 @@ def initialize():
   global IBUS, REGISTERED, DEVPATH
   REGISTERED=False
   
+  #mpd = Audio.MpdClient()
+  webServer.start()
+  
+  #mpd.client.listallinfo()
+  #print mpdClient.commands()
+  #Audio.init()
+  #print Audio.client().lsinfo()
+  #print Audio.client().commands()
+  #print Audio.client().listplaylists()
+  mpdClient.init()
+  
+  
+  #print "wtf"
+  #sync = ItunesSync()
+  #sync.start()
+  
+  #sys.exit(0)
+  
   # Initialize the iBus interface or wait for it to become available.
   while IBUS == None:
+    
+    #print mpdClient.currentsong()
+    
     if os.path.exists(DEVPATH):
       IBUS = ibusFace(DEVPATH)
     else:
-      logging.warning("USB interface not found at (%s). Waiting 1 seconds.", DEVPATH)
+      log.warning("USB interface not found at (%s). Waiting 1 seconds.", DEVPATH)
       time.sleep(2)
   
   IBUS.waitClearBus() # Wait for the iBus to clear, then send some initialization signals
@@ -44,14 +75,20 @@ def initialize():
 def shutdown():
   global IBUS
   
-  logging.info("Shutting down event driver")
+  log.info("Shutting down event driver")
   eventDriver.shutDown()
   
-  logging.info("Shutting down tick driver")
+  log.info("Shutting down tick driver")
   tickDriver.shutDown()
   
+  log.info("Shutting down mpd client")
+  mpdClient.shutDown()
+  
+  log.info("Shutting down web server")
+  webServer.shutDown()
+  
   if IBUS:
-    logging.info("Killing iBUS instance")
+    log.info("Killing iBUS instance")
     IBUS.close()
     IBUS = None
 

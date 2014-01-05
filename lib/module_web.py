@@ -1,9 +1,14 @@
 import web, os, sys, subprocess, commands, mimetypes, re
 import json as JSON
-import module_audio as pB_audio
 import threading
 import posixpath
 import urllib
+from itunes_sync import itunesSync
+from module_audio import mpdClient
+from logger import PLog
+
+log = PLog(__name__)
+
 
 def enum(**enums):
   return type('Enum', (), enums)
@@ -14,18 +19,23 @@ urls = (
   '/', 'index',
   '/sync', 'sync',
   '/update', 'update',
-  '/get_library', 'getLibrary',
+  '/action/(.+)', 'action',
+  '/library', 'library',
   '/get_playlist', 'getPlaylist',
   '/getInfoPath', 'getInfoPath',
   '/playlistMod', 'playlistMod',
   '/status', 'status'
 )
 
+
 root_path = os.path.join(os.path.dirname( __file__ ), '..')
+
+#root_path = ""
 
 template_path = "%s/templates/" % root_path
 static_path = "%s/static/" % root_path
 #print template_path
+
 
 render = web.template.render(template_path)
 PYBUS_SOCKET_FILE = "/tmp/ibus_custom.log"
@@ -53,7 +63,20 @@ def getCustomData():
 
 #########################
 # Web stuff
-#########################  
+#########################
+
+def statusJson():
+	return {
+	  "sync" : itunesSync.status(),
+	  "elapsed": mpdClient.elapsed.elapsed,
+      "currentsong": mpdClient.mpd_currentsong.json(),
+      "playlist": mpdClient.mpd_playlistinfo.json(),
+      "status": mpdClient.mpd_status.json(),
+      "playlists": mpdClient.mpd_lsinfo.json()
+    }
+
+
+
 class index:
   def GET(self):
     #pB_audio.init()
@@ -61,22 +84,61 @@ class index:
 
 class sync:
   def GET(self):
-    return "sync"
+    web.header('Content-Type', 'application/json')
+    _sync = itunesSync.start()
+    result = {
+      "sync" : itunesSync.status()
+    }
+    return JSON.dumps(result)
+
+class action:
+  def GET(self, action = None):
+    web.header('Content-Type', 'application/json')
+    data = web.input(_method='get')
+    
+    _params = None
+
+    try:
+      _params = data.params.split(",")
+    except:
+      pass
+
+    args = []
+    
+    if _params:
+      for i in _params:
+        if i in data.keys():
+          args.append(data[i])
+    
+    
+    if action:
+      result = False
+     
+      try:
+        _f = getattr(mpdClient, action)
+        _r = _f(*args)
+        result = statusJson()
+        result["action"] = _r
+        
+      except AttributeError:
+        log.info("Action %s not available", action)
+    return JSON.dumps(result)
   
 
-class musicStatus:
+class status:
   def GET(self):
-    global currentTrackID
-    status = pB_audio.getInfo(currentTrackID)
-    status['custom'] = getCustomData()
-    if ('songid' in status['status'].keys()):
-      currentTrackID = status['status']['songid']
-    return JSON.dumps(status)
+    web.header('Content-Type', 'application/json')
+    result = statusJson()
+    return JSON.dumps(result)
 
-class getLibrary:
+class library:
   def GET(self):
-    library = pB_audio.getLibrary()
-    return JSON.dumps(library)
+    web.header('Content-Type', 'application/json')
+    mpdClient.listallinfo()
+    _result = {
+      "library" : mpdClient.mpd_listallinfo.json()
+    }
+    return JSON.dumps(_result)
 
 class getPlaylist:
   def GET(self):
@@ -118,45 +180,12 @@ class playlistMod:
 
 def init():
   #pB_audio.init()
-  web.config.debug = False
-  app = WebApplication(urls, globals())
-  wsgifunc = app.wsgifunc()
-  wsgifunc = StaticMiddleware(wsgifunc)
-  wsgifunc = web.httpserver.LogMiddleware(wsgifunc)
-  server = web.httpserver.WSGIServer(("0.0.0.0", HTTP_PORT), wsgifunc)
+  #web.config.debug = False
+  #app = WebApplication(urls, globals())
+  #wsgifunc = app.wsgifunc()
+  #wsgifunc = StaticMiddleware(wsgifunc)
+  #wsgifunc = web.httpserver.LogMiddleware(wsgifunc)
+  #server = web.httpserver.WSGIServer(("0.0.0.0", HTTP_PORT), wsgifunc)
   print "http://%s:%d/" % ("0.0.0.0", HTTP_PORT)
-
-  return server
-
-
-
-class WebApplication(web.application):
-    def run(self, port=HTTP_PORT, *middleware):
-        func = self.wsgifunc(*middleware)
-        return web.httpserver.runsimple(func, ('0.0.0.0', port))
-        
-class StaticMiddleware:
-    """WSGI middleware for serving static files."""
-    def __init__(self, app, prefix='/static/', root_path=static_path):
-        self.app = app
-        self.prefix = prefix
-        self.root_path = root_path
-
-    def __call__(self, environ, start_response):
-        path = environ.get('PATH_INFO', '')
-        path = self.normpath(path)
-        
-        if path.startswith(self.prefix):
-            environ["PATH_INFO"] = os.path.join(self.root_path, web.lstrips(path, self.prefix))
-            
-            return web.httpserver.StaticApp(environ, start_response)
-        else:
-            return self.app(environ, start_response)
-
-    def normpath(self, path):
-        path2 = posixpath.normpath(urllib.unquote(path))
-        if path.endswith("/"):
-            path2 += "/"
-        return path2
-        
-        
+  app = web.application(urls, globals())
+  return app
